@@ -9,7 +9,7 @@ function fva_preprocess(S, b, lb, ub, rxns;
     )
 
     # FVA
-    _bidx = trues(N)
+    _bidx = trues(size(S, 2))
     _bidx[ignore] .= false
     non_ignored = findall(_bidx)
 
