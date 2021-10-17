@@ -1,0 +1,13 @@
+name = "MetLP"
+uuid = "bb7579a6-17cc-4454-bc80-c1b83f10c6c8"
+authors = ["josePereiro <jose.pereiro.lab@gmail.com> and contributors"]
+version = "0.1.0"
+
+[compat]
+julia = "1.5"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]
