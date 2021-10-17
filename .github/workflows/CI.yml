@@ -10,7 +10,6 @@ jobs:
       fail-fast: false
       matrix:
         version:
-          - '1.5'
           - '1.6'
           - 'nightly'
         os:
@@ -23,6 +22,8 @@ jobs:
         with:
           version: ${{ matrix.version }}
           arch: ${{ matrix.arch }}
+      - name: Install Custom Registry
+        run: julia -e 'import Pkg; Pkg.Registry.add(Pkg.RegistrySpec(;url="https://github.com/FF-UH/CSC_Registry.jl"))'
       - uses: actions/cache@v1
         env:
           cache-name: cache-artifacts
