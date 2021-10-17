@@ -8,12 +8,8 @@ function fva_preprocess(S, b, lb, ub, rxns;
         protect = [], # rxns skip blocking
     )
 
-    m, n = size(S)
-    ei = zeros(n)
-    blocked = falses(n)
-
     # FVA
-    _bidx = trues(n)
+    _bidx = trues(N)
     _bidx[ignore] .= false
     non_ignored = findall(_bidx)
 
