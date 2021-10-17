@@ -1,14 +1,17 @@
 function fva(S, b, lb, ub, idxs = eachindex(lb); 
         check_obj::Union{Nothing, Int} = nothing, 
         check_obj_atol::Real = 1e-4,
-        verbose = true, batchlen::Int = 50,
+        verbose = true, 
+        batchlen::Int = 50,
         zeroth::Real = 1e-10,
-        on_empty_sol::Function = (idx, sense) -> error("FBA failed, empty solution returned!!!")
+        on_empty_sol::Function = (idx, sense) -> error("FBA failed, empty solution returned!!!"),
+        nths = nthreads()
     )
 
+    nths = max(nths, 1)
+    
     M, N = size(S)
     T = eltype(S)
-    nths = nthreads()
 
     # Channels (avoid race)
     env_pool = Dict()
@@ -40,7 +43,7 @@ function fva(S, b, lb, ub, idxs = eachindex(lb);
             for idx in batch
 
                 tsv[idx] = sense
-                sol = linprog(
+                LPsol = linprog(
                     tsv, # Opt sense vector 
                     S, # Stoichiometric matrix
                     b, # row lb
@@ -49,7 +52,7 @@ function fva(S, b, lb, ub, idxs = eachindex(lb);
                     ub, # column ub
                     ClpSolver()
                 )
-                x = isempty(sol.sol) ? on_empty_sol(idx, sense) : sol.sol[idx]
+                x = isempty(LPsol.sol) ? on_empty_sol(idx, sense) : LPsol.sol[idx]
                 fvacol[idx] = abs(x) < zeroth ? zero(x) : x
                 tsv[idx] = zero(sense)
 
