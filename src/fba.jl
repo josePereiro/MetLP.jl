@@ -24,10 +24,13 @@ function fba(S, b, lb, ub, idx1::Integer, idx2::Integer;
         sense1 = MAX_SENSE,
         sense2 = MIN_SENSE,
         btol = 0.0, # tol of the fixation
+        sv = zeros(size(S, 2)),
         kwargs...
     )
     # maximizing obj
-    FBAOut1 = fba(S, b, lb, ub, idx1; sense = sense1, kwargs...)
+    sv[idx1] = sense1
+    FBAOut1 = fba(S, b, lb, ub, idx1; sense = sense1, sv, kwargs...)
+    sv[idx1] = zero(sense1)
     obj_val = FBAOut1.obj_val
     # fix obj
     # TODO: do not copy here
@@ -37,20 +40,20 @@ function fba(S, b, lb, ub, idx1::Integer, idx2::Integer;
     lb_[idx1] = obj_val - dflux
     ub_[idx1] = obj_val + dflux
     # minimize cost
-    return fba(S, b, lb_, ub_, idx2; sense = sense2, kwargs...)
+    sv[idx1] = sense2
+    return fba(S, b, lb_, ub_, idx2; sense = sense2, sv, kwargs...)
 end
 
-function fba!(model::MetNet, obj_ider::IDER_TYPE; 
-        sv = model.c, kwargs...
+function fba(model::MetNet, obj_ider::IDER_TYPE; 
+        sv = zeros(size(model, 2)), kwargs...
     )
     obj_idx = rxnindex(model, obj_ider)
     model_fields = _extract_dense(model, [:S, :b, :lb, :ub])
     return fba(model_fields..., obj_idx; sv, kwargs...)
 end
 
-function fba!(model::MetNet, ider1::IDER_TYPE, ider2::IDER_TYPE; 
-        sv = model.c, 
-        kwargs...
+function fba(model::MetNet, ider1::IDER_TYPE, ider2::IDER_TYPE; 
+        sv = zeros(size(model, 2)), kwargs...
     )
     idx1 = rxnindex(model, ider1)
     idx2 = rxnindex(model, ider2)
