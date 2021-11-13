@@ -8,9 +8,9 @@ function check_newbounds(S, b, lb, ub, newlb, newub,
         batchlen = 50
     )
 
-    M, N = size(S)
     T = eltype(S)
-    nths = nthreads()
+    fbaout = FBAOut(T)
+    on_non_optimal_sol = (idx, lp_model) -> nothing # ignore errors
     ref_obj_val = fba(S, b, lb, ub, check_obj).obj_val
 
     # working copy
@@ -25,7 +25,8 @@ function check_newbounds(S, b, lb, ub, newlb, newub,
         # Test whole batch (this use the heuristic that only a few rxns will affect the biomass)
         wlb[batch] = @view newlb[batch]
         wub[batch] = @view newub[batch]
-        new_obj_val = fba(S, b, wlb, wub, check_obj).obj_val
+        fbaout = fba(S, b, wlb, wub, check_obj; on_non_optimal_sol)
+        new_obj_val = fbaout.obj_val
         if !isapprox(new_obj_val, ref_obj_val; atol = check_obj_atol)
 
             # reset batch
@@ -37,16 +38,20 @@ function check_newbounds(S, b, lb, ub, newlb, newub,
                 
                 # check both first 
                 wlb[idx], wub[idx] = newlb[idx], newub[idx]
-                new_obj_val = fba(S, b, wlb, wub, check_obj).obj_val
+                fbaout = fba(S, b, wlb, wub, check_obj; on_non_optimal_sol)
+                new_obj_val = fbaout.obj_val
 
                 if !isapprox(new_obj_val, ref_obj_val; atol = check_obj_atol)
                     wlb[idx], wub[idx] = lb[idx], ub[idx] # reset both
                     
                     # if obj_val changed I check each bound
-                    for (wcol, newb, oldb) in [(wlb, newlb[idx], lb[idx]), 
-                                                (wub, newub[idx], ub[idx])]
+                    for (wcol, newb, oldb) in [
+                            (wlb, newlb[idx], lb[idx]), 
+                            (wub, newub[idx], ub[idx])
+                        ]
                         wcol[idx] = newb
-                        new_obj_val = fba(S, b, wlb, wub, check_obj).obj_val
+                        fbaout = fba(S, b, wlb, wub, check_obj; on_non_optimal_sol)
+                        new_obj_val = fbaout.obj_val
                         if !isapprox(new_obj_val, ref_obj_val; atol = check_obj_atol)
                             wcol[idx] = oldb # reset
                         end
@@ -67,52 +72,3 @@ function check_newbounds(S, b, lb, ub, newlb, newub,
 
     return wlb, wub
 end
-
-
-# given a model and a new set of bounds check
-# # how they will affect a given obj reaction
-# function check_newbounds(S, b, lb, ub, newlb, newub, 
-#     check_obj::Int, idxs = eachindex(lb); 
-#     check_obj_atol = 1e-4,
-#     verbose = true,
-#     batchlen = 50)
-
-#     M, N = size(S)
-#     T = eltype(S)
-#     ref_obj_val = fba(S, b, lb, ub, check_obj).obj_val
-
-#     # thread environment (avoid race)
-#     wlb, wub = deepcopy.([lb, ub])
-
-#     icount = length(idxs)
-#     verbose && (prog = Progress(icount; desc = "Checking bounds  "))
-        
-#     # If whole batch fail, test independent idxs
-#     for idx in idxs
-
-#         # check both first (this use the heuristic that only a few rxns will affect the biomass)
-#         wlb[idx], wub[idx] = newlb[idx], newub[idx]
-#         new_obj_val = fba(S, b, wlb, wub, check_obj).obj_val
-
-#         if !isapprox(new_obj_val, ref_obj_val; atol = check_obj_atol)
-#             wlb[idx], wub[idx] = lb[idx], ub[idx] # reset both
-            
-#             # if obj_val changed I check each bound
-#             for (wcol, newb, oldb) in [(wlb, newlb[idx], lb[idx]), 
-#                                         (wub, newub[idx], ub[idx])]
-#                 wcol[idx] = newb
-#                 new_obj_val = fba(S, b, wlb, wub, check_obj).obj_val
-#                 if !isapprox(new_obj_val, ref_obj_val; atol = check_obj_atol)
-#                     wcol[idx] = oldb # reset
-#                 end
-#             end
-#         end
-#         verbose && next!(prog; showvalues = [
-#                 (:ref_obj_val, ref_obj_val), 
-#                 (:new_obj_val, new_obj_val)
-#             ] 
-#         )
-#     end
-
-#     return wlb, wub
-# end

@@ -1,10 +1,11 @@
 function yLP(S, b, lb, ub, c, d; 
         ϵ = 1e-5, 
         sense = JuMP.MOI.MAX_SENSE,
-        solver = GLPK.Optimizer
+        solver = Clp.Optimizer
     )
 
     lp_model = JuMP.Model(solver)
+    JuMP.set_silent(lp_model)
     M, N = size(S)
 
     # Variables

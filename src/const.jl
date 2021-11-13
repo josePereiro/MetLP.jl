@@ -1,2 +1,2 @@
-const MAX_SENSE = -1.0
-const MIN_SENSE = 1.0
+const MAX_SENSE = JuMP.MOI.MAX_SENSE
+const MIN_SENSE = JuMP.MOI.MIN_SENSE

@@ -1,20 +1,28 @@
 function fba(S, b, lb, ub, obj_idx::Integer; 
         sense = MAX_SENSE, 
-        sv = zeros(size(S, 2)), 
-        drop_LPsol = true
+        drop_LPsol = true, 
+        solver = Clp.Optimizer, 
+        on_non_optimal_sol::Function = (idx, lp_model) -> error("FBA failed, non OPTIMAL solution returned!!!"),
     )
-    sv[obj_idx] = sense
-    LPsol = linprog(
-        sv, # Opt sense vector 
-        S, # Stoichiometric matrix
-        b, # row lb
-        b, # row ub
-        lb, # column lb
-        ub, # column ub
-        ClpSolver()
-    )
-    v = LPsol.sol
-    LPsol = drop_LPsol ? nothing : LPsol
+
+    T = eltype(S)
+    M, N = size(S)
+
+    lp_model = JuMP.Model(solver)
+    JuMP.set_silent(lp_model)
+    @JuMP.variable(lp_model, lb[i] <= x[i=1:N] <= ub[i])
+    @JuMP.constraint(lp_model, S * x .- b .== 0.0)
+    @JuMP.objective(lp_model, sense, x[obj_idx])
+    JuMP.optimize!(lp_model)
+    status = JuMP.termination_status(lp_model)
+    if status == JuMP.MOI.OPTIMAL
+        v = JuMP.value.(x)
+    else
+        on_non_optimal_sol(obj_idx, lp_model)
+        return FBAOut(T)
+    end
+
+    LPsol = drop_LPsol ? nothing : lp_model
     return isempty(v) ? 
         FBAOut(fill(NaN, size(S, 2)), NaN, obj_idx, LPsol) : 
         FBAOut(v, v[obj_idx], obj_idx, LPsol)
@@ -24,39 +32,57 @@ function fba(S, b, lb, ub, idx1::Integer, idx2::Integer;
         sense1 = MAX_SENSE,
         sense2 = MIN_SENSE,
         btol = 0.0, # tol of the fixation
-        sv = zeros(size(S, 2)),
-        kwargs...
+        drop_LPsol = true,
+        solver = Clp.Optimizer, 
+        on_non_optimal_sol::Function = (idx, lp_model) -> error("FBA failed, non OPTIMAL solution returned!!!"),
     )
+
     # maximizing obj
-    sv[idx1] = sense1
-    FBAOut1 = fba(S, b, lb, ub, idx1; sense = sense1, sv, kwargs...)
-    sv[idx1] = zero(sense1)
-    obj_val = FBAOut1.obj_val
-    # fix obj
-    # TODO: do not copy here
-    lb_ = copy(lb)
-    ub_ = copy(ub)
-    dflux = abs(obj_val * btol)
-    lb_[idx1] = obj_val - dflux
-    ub_[idx1] = obj_val + dflux
-    # minimize cost
-    sv[idx1] = sense2
-    return fba(S, b, lb_, ub_, idx2; sense = sense2, sv, kwargs...)
+    M, N = size(S)
+
+    lp_model = JuMP.Model(solver)
+    JuMP.set_silent(lp_model)
+    @JuMP.variable(lp_model, lb[i] <= x[i=1:N] <= ub[i])
+    @JuMP.constraint(lp_model, S * x .- b .== 0.0)
+    
+    # optimization idx1
+    @JuMP.objective(lp_model, sense1, x[idx1])
+    JuMP.optimize!(lp_model)
+    status = JuMP.termination_status(lp_model)
+    if status != JuMP.MOI.OPTIMAL
+        on_non_optimal_sol(idx1, lp_model)
+        return FBAOut(T)
+    end
+    val1 = JuMP.objective_value(lp_model)
+    
+    # optimization idx2
+    dflux = abs(val1 * btol)
+    @JuMP.constraint(lp_model, val1 - dflux <= x[idx1] <= val1 + dflux)
+    @JuMP.objective(lp_model, sense2, x[idx2])
+    JuMP.optimize!(lp_model)
+    status = JuMP.termination_status(lp_model)
+    if status != JuMP.MOI.OPTIMAL
+        on_non_optimal_sol(idx2, lp_model)
+        return FBAOut(T)
+    end
+    v = JuMP.value.(x)
+
+    LPsol = drop_LPsol ? nothing : lp_model
+    return isempty(v) ? 
+        FBAOut(fill(NaN, size(S, 2)), NaN, idx1, LPsol) : 
+        FBAOut(v, v[idx1], idx1, LPsol)
 end
 
-function fba(model::MetNet, obj_ider::IDER_TYPE; 
-        sv = zeros(size(model, 2)), kwargs...
+function fba(model::MetNet, obj_ider::IDER_TYPE; kwargs...
     )
     obj_idx = rxnindex(model, obj_ider)
     model_fields = _extract_dense(model, [:S, :b, :lb, :ub])
-    return fba(model_fields..., obj_idx; sv, kwargs...)
+    return fba(model_fields..., obj_idx; kwargs...)
 end
 
-function fba(model::MetNet, ider1::IDER_TYPE, ider2::IDER_TYPE; 
-        sv = zeros(size(model, 2)), kwargs...
-    )
+function fba(model::MetNet, ider1::IDER_TYPE, ider2::IDER_TYPE; kwargs...)
     idx1 = rxnindex(model, ider1)
     idx2 = rxnindex(model, ider2)
     model_fields = _extract_dense(model, [:S, :b, :lb, :ub])
-    return fba(model_fields..., idx1, idx2; sv, kwargs...)
+    return fba(model_fields..., idx1, idx2; kwargs...)
 end

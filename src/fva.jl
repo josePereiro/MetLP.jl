@@ -1,81 +1,69 @@
-function fva(S, b, lb, ub, idxs = eachindex(lb); 
+function _build_lpmodel(S, b, lb, ub, solver)
+    _, N = size(S)
+    lp_model = JuMP.Model(solver)
+    JuMP.set_silent(lp_model)
+    JuMP.@variable(lp_model, lb[i] <= x[i=1:N] <= ub[i])
+    JuMP.@constraint(lp_model, S * lp_model[:x] .- b .== 0.0)
+    return lp_model
+end
+
+function fva(S, b, lb, ub, ridxs = eachindex(lb); 
         check_obj::Union{Nothing, Int} = nothing, 
         check_obj_atol::Real = 1e-4,
         verbose = true, 
         batchlen::Int = 50,
-        zeroth::Real = 1e-10,
-        on_empty_sol::Function = (idx, sense) -> error("FBA failed, empty solution returned!!!"),
-        nths = nthreads()
+        on_non_optimal_sol::Function = (idx, lp_model) -> error("FBA failed, non OPTIMAL solution returned!!!"),
+        nths = nthreads(), 
+        solver = Clp.Optimizer
     )
 
-    nths = max(nths, 1)
-    
-    M, N = size(S)
-    T = eltype(S)
+    ridxs = collect(ridxs)
 
-    # Channels (avoid race)
-    env_pool = Dict()
-    for tid in 1:nths
-        get!(env_pool, tid, 
-            (
-                tsv = zeros(T, N), 
-                tfvalb = Dict{Int, T}(), 
-                tfvaub = Dict{Int, T}()
-            )
-        )
+    # bounds
+    fvalb = lb[ridxs]
+    fvaub = ub[ridxs]
+
+    verbose && (prog = Progress(length(ridxs); desc = "Doing FVA (-t$nths)  "))
+    ii_ch = Channel{Int}(nths) do ch_
+        for ii in eachindex(ridxs)
+            put!(ch_, ii)
+            verbose && next!(prog)
+        end
     end
 
-    icount = length(idxs)
-    batchlen = max(1, min(batchlen, length(idxs)))
-    batches = [idxs[i0:(min(i0 + batchlen - 1, icount))] for i0 in 1:batchlen:icount]
-    verbose && (prog = Progress(length(batches); desc = "Doing FVA (-t$nths)  "))
-    @threads for batch in batches
-        
-        # checks
-        tid = threadid()
-    
-        # get environment
-        tsv, tfvalb, tfvaub = env_pool[tid]
-        
-        verbose && next!(prog)
-        for (fvacol, sense) in [(tfvalb, one(T)), (tfvaub, -one(T))]
-            
-            for idx in batch
+    # TODO: make a MWE and ask in discourse!
+    @threads for _ in 1:nths
 
-                tsv[idx] = sense
-                LPsol = linprog(
-                    tsv, # Opt sense vector 
-                    S, # Stoichiometric matrix
-                    b, # row lb
-                    b, # row ub
-                    lb, # column lb
-                    ub, # column ub
-                    ClpSolver()
-                )
-                x = isempty(LPsol.sol) ? on_empty_sol(idx, sense) : LPsol.sol[idx]
-                fvacol[idx] = abs(x) < zeroth ? zero(x) : x
-                tsv[idx] = zero(sense)
+        lp_model = _build_lpmodel(S, b, lb, ub, solver)
 
+        for ii in ii_ch
+            ridx = ridxs[ii]
+
+            # optimize max
+            JuMP.@objective(lp_model, MIN_SENSE, lp_model[:x][ridx])
+            JuMP.optimize!(lp_model)
+            status = JuMP.termination_status(lp_model)
+            if status == JuMP.MOI.OPTIMAL
+                fvalb[ii] = JuMP.objective_value(lp_model)
+                else; on_non_optimal_sol(ridx, lp_model)
             end
-            
-        end # for idx in idxs
+
+            # optimize min
+            JuMP.@objective(lp_model, MAX_SENSE, lp_model[:x][ridx])
+            JuMP.optimize!(lp_model)
+            status = JuMP.termination_status(lp_model)
+            if status == JuMP.MOI.OPTIMAL
+                fvaub[ii] = max(JuMP.objective_value(lp_model), fvalb[ii])
+                else; on_non_optimal_sol(ridx, lp_model)
+            end
+        end
     end
     verbose && finish!(prog)
 
-    # Collect results
-    merged_fvalb, merged_fvaub = Dict{Int, T}(), Dict{Int, T}()
-    for (tid, (tsv, tfvalb, tfvaub)) in env_pool
-        merge!(merged_fvalb, tfvalb)
-        merge!(merged_fvaub, tfvaub)
-    end
-
-    # return just the indexed bounds
-    fvalb, fvaub = getindex.([merged_fvalb], idxs), getindex.([merged_fvaub], idxs)
-
     # Check bounds
     if !isnothing(check_obj)
-        return check_newbounds(S, b, lb, ub, fvalb, fvaub, 
-            check_obj, idxs; check_obj_atol, verbose, batchlen
+        return MetLP.check_newbounds(S, b, lb, ub, fvalb, fvaub, 
+            check_obj, ridxs; check_obj_atol, verbose, batchlen
         )
     end
 
