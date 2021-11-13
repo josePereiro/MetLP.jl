@@ -1,14 +1,14 @@
 name = "MetLP"
 uuid = "bb7579a6-17cc-4454-bc80-c1b83f10c6c8"
 authors = ["josePereiro <jose.pereiro.lab@gmail.com> and contributors"]
-version = "0.1.4"
+version = "0.2.0"
 
 [deps]
-Clp = "e2554f3b-3117-50c0-817c-e040a3ddf72d"
-JuMP = "4076af6c-e467-56ae-b986-b466b2749572"
 MetNets = "e57bcde5-101c-47b4-bac9-e79e238e37d4"
-ProgressMeter = "92933f4c-e287-5a05-a399-4b506db050ca"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
+Clp = "e2554f3b-3117-50c0-817c-e040a3ddf72d"
+ProgressMeter = "92933f4c-e287-5a05-a399-4b506db050ca"
+JuMP = "4076af6c-e467-56ae-b986-b466b2749572"
 
 [compat]
 julia = "1.5"
