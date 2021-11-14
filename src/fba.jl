@@ -1,9 +1,6 @@
 function fba(lp_model::JuMP.Model, obj_idx::Integer; 
         sense = MAX_SENSE, drop_LPsol = true
     )
-
-    # setup
-    JuMP.set_silent(lp_model)
     
     optimize!(lp_model, obj_idx; sense)
 

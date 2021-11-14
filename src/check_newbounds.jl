@@ -5,11 +5,14 @@ function check_newbounds(S, b, lb, ub, newlb, newub,
         check_obj::Int, idxs = eachindex(lb); 
         check_obj_atol = 1e-4,
         verbose = true,
-        batchlen = 50
+        batchlen = 50, 
+        solver = Clp.Optimizer
     )
 
-    fbaout = nothing
-    ref_obj_val = fba(S, b, lb, ub, check_obj).obj_val
+    lp_model = build_lp_model(S, b, lb, ub, solver)
+    fbaout = fba(lp_model, check_obj)
+    isempty(fbaout) && error("fba returns is empty")
+    ref_obj_val = objval(fbaout)
 
     # working copy
     wlb, wub = deepcopy.([lb, ub])
@@ -23,8 +26,15 @@ function check_newbounds(S, b, lb, ub, newlb, newub,
         # Test whole batch (this use the heuristic that only a few rxns will affect the biomass)
         wlb[batch] = @view newlb[batch]
         wub[batch] = @view newub[batch]
-        fbaout = fba(S, b, wlb, wub, check_obj)
-        new_obj_val = fbaout.obj_val
+
+        # (TODO: This can be improved by updating only the relevant lp_model bounds)
+        # Update bounds 
+        set_lb_con!(lp_model, wlb)
+        set_ub_con!(lp_model, wub)
+
+        # fba
+        fbaout = fba(lp_model, check_obj)
+        new_obj_val = objval(fbaout)
         if !isapprox(new_obj_val, ref_obj_val; atol = check_obj_atol)
 
             # reset batch
@@ -36,8 +46,14 @@ function check_newbounds(S, b, lb, ub, newlb, newub,
                 
                 # check both first 
                 wlb[idx], wub[idx] = newlb[idx], newub[idx]
-                fbaout = fba(S, b, wlb, wub, check_obj)
-                new_obj_val = fbaout.obj_val
+
+                # Update bounds
+                set_lb_con!(lp_model, wlb)
+                set_ub_con!(lp_model, wub)
+
+                # fba
+                fbaout = fba(lp_model, check_obj)
+                new_obj_val = objval(fbaout)
 
                 if !isapprox(new_obj_val, ref_obj_val; atol = check_obj_atol)
                     wlb[idx], wub[idx] = lb[idx], ub[idx] # reset both
@@ -48,8 +64,14 @@ function check_newbounds(S, b, lb, ub, newlb, newub,
                             (wub, newub[idx], ub[idx])
                         ]
                         wcol[idx] = newb
-                        fbaout = fba(S, b, wlb, wub, check_obj)
-                        new_obj_val = fbaout.obj_val
+
+                        # Update bounds
+                        set_lb_con!(lp_model, wlb)
+                        set_ub_con!(lp_model, wub)
+
+                        # fba
+                        fbaout = fba(lp_model, check_obj)
+                        new_obj_val = objval(fbaout)
                         if !isapprox(new_obj_val, ref_obj_val; atol = check_obj_atol)
                             wcol[idx] = oldb # reset
                         end
@@ -59,10 +81,10 @@ function check_newbounds(S, b, lb, ub, newlb, newub,
         end
 
         verbose && next!(prog; showvalues = [
-                        (:ref_obj_val, ref_obj_val), 
-                        (:curr_obj_val, new_obj_val)
-                    ] 
-                )
+                (:ref_obj_val, ref_obj_val), 
+                (:curr_obj_val, new_obj_val)
+            ] 
+        )
 
     end # for batch in batches
 

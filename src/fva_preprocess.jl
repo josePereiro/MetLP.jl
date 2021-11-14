@@ -14,9 +14,11 @@ function fva_preprocess(S, b, lb, ub, rxns;
     non_ignored = findall(_bidx)
 
     fvalb, fvaub = (lb, ub) .|> copy
-    fvalb[non_ignored], fvaub[non_ignored] = fva(S, b, lb, ub, non_ignored; 
-                                                    check_obj_atol, check_obj, 
-                                                    batchlen, verbose)
+    fvalb[non_ignored], fvaub[non_ignored] = fva(
+        S, b, lb, ub, non_ignored; 
+        check_obj_atol, check_obj, 
+        batchlen, verbose
+    )
 
     return del_blocked(S, b, fvalb, fvaub, rxns; eps, protect)
 end
@@ -37,10 +39,12 @@ function fva_preprocess(metnet::MetNet;
     
     model_fields = _extract_dense(metnet, [:S, :b, :lb, :ub])
     rxns = eachindex(metnet.rxns)
-    S, b, lb, ub, rxnis, blocked = fva_preprocess(model_fields..., rxns; 
-                                                    check_obj, verbose, eps, 
-                                                    ignore, protect, batchlen, 
-                                                    check_obj_atol);
+    S, b, lb, ub, rxnis, blocked = fva_preprocess(
+        model_fields..., rxns; 
+        check_obj, verbose, eps, 
+        ignore, protect, batchlen, 
+        check_obj_atol
+    );
     
     rxns = metnet.rxns[rxnis]
     metnet = MetNet(metnet; S, b, lb, ub, rxns)

@@ -1,12 +1,3 @@
-function _build_lpmodel(S, b, lb, ub, solver)
-    _, N = size(S)
-    lp_model = JuMP.Model(solver)
-    JuMP.set_silent(lp_model)
-    JuMP.@variable(lp_model, lb[i] <= x[i=1:N] <= ub[i])
-    JuMP.@constraint(lp_model, S * lp_model[:x] .- b .== 0.0)
-    return lp_model
-end
-
 function fva(S, b, lb, ub, ridxs = eachindex(lb); 
         check_obj::Union{Nothing, Int} = nothing, 
         check_obj_atol::Real = 1e-4,
@@ -31,16 +22,16 @@ function fva(S, b, lb, ub, ridxs = eachindex(lb);
         end
     end
 
-    # TODO: make a MWE and ask in discourse!
     @threads for _ in 1:nths
 
-        lp_model = _build_lpmodel(S, b, lb, ub, solver)
+        lp_model = build_lp_model(S, b, lb, ub, solver)
+        x = _get_vars(lp_model)
 
         for ii in ii_ch
             ridx = ridxs[ii]
 
             # optimize max
-            JuMP.@objective(lp_model, MIN_SENSE, lp_model[:x][ridx])
+            JuMP.@objective(lp_model, MIN_SENSE, x[ridx])
             JuMP.optimize!(lp_model)
             status = JuMP.termination_status(lp_model)
             if status == JuMP.MOI.OPTIMAL
@@ -49,7 +40,7 @@ function fva(S, b, lb, ub, ridxs = eachindex(lb);
             end
 
             # optimize min
-            JuMP.@objective(lp_model, MAX_SENSE, lp_model[:x][ridx])
+            JuMP.@objective(lp_model, MAX_SENSE, x[ridx])
             JuMP.optimize!(lp_model)
             status = JuMP.termination_status(lp_model)
             if status == JuMP.MOI.OPTIMAL
