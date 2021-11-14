@@ -65,7 +65,7 @@ function set_ub_con!(lp_model, ub, cidxs = 1:_length(lp_model))
     return lp_model
 end
 
-function _optimize!(lp_model, obj_idx; sense = JuMP.MOI.MAX_SENSE)
+function optimize!(lp_model, obj_idx; sense = JuMP.MOI.MAX_SENSE)
     x = _get_vars(lp_model)
     @JuMP.objective(lp_model, sense, x[obj_idx])
     JuMP.optimize!(lp_model)
@@ -74,8 +74,8 @@ end
 
 function FBAOut(lp_model::JuMP.Model, obj_idx; drop_LPsol = true)
     N = length(_get_vars(lp_model))
-    LPsol = drop_LPsol ? nothing : lp_model
     status = JuMP.termination_status(lp_model)
+    LPsol = drop_LPsol ? nothing : lp_model
     if status != JuMP.MOI.OPTIMAL
         return FBAOut(fill(NaN, N), NaN, obj_idx, LPsol)
     end

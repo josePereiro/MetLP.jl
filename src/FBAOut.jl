@@ -8,4 +8,4 @@ end
 # empty FBAOut
 objval(out::FBAOut) = out.obj_val
 objider(out::FBAOut) = out.obj_ider
-LPsol(out::FBAOut) = out.sol
+get_lp_model(out::FBAOut) = out.sol

@@ -1,3 +1,15 @@
+function fba(lp_model::JuMP.Model, obj_idx::Integer; 
+        sense = MAX_SENSE, drop_LPsol = true
+    )
+
+    # setup
+    JuMP.set_silent(lp_model)
+    
+    optimize!(lp_model, obj_idx; sense)
+
+    return FBAOut(lp_model, obj_idx; drop_LPsol)
+end
+
 function fba(S, b, lb, ub, obj_idx::Integer; 
         sense = MAX_SENSE, 
         drop_LPsol = true, 
@@ -11,19 +23,14 @@ function fba(S, b, lb, ub, obj_idx::Integer;
     # build model
     if isnothing(lp_model)
         lp_model = build_lp_model(S, b, lb, ub, solver)
+    else
+        # update cons
+        up_stoi_con && set_stoi_con!(lp_model, S, b)
+        up_lb_con && set_lb_con!(lp_model, lb)
+        up_ub_con && set_ub_con!(lp_model, ub)
     end
 
-    # update cons
-    up_stoi_con && set_stoi_con!(lp_model, S, b)
-    up_lb_con && set_lb_con!(lp_model, lb)
-    up_ub_con && set_ub_con!(lp_model, ub)
-
-    # setup
-    JuMP.set_silent(lp_model)
-    
-    _optimize!(lp_model, obj_idx; sense)
-
-    return FBAOut(lp_model, obj_idx; drop_LPsol)
+    fba(lp_model, obj_idx; sense, drop_LPsol)
 end
 
 function fba(S, b, lb, ub, idx1::Integer, idx2::Integer;
@@ -41,18 +48,15 @@ function fba(S, b, lb, ub, idx1::Integer, idx2::Integer;
     # build model
     if isnothing(lp_model)
         lp_model = build_lp_model(S, b, lb, ub, solver)
+    else
+        # update cons
+        up_stoi_con && set_stoi_con!(lp_model, S, b)
+        up_lb_con && set_lb_con!(lp_model, lb)
+        up_ub_con && set_ub_con!(lp_model, ub)
     end
-
-    # update cons
-    up_stoi_con && set_stoi_con!(lp_model, S, b)
-    up_lb_con && set_lb_con!(lp_model, lb)
-    up_ub_con && set_ub_con!(lp_model, ub)
-    
-    # setup
-    JuMP.set_silent(lp_model)
     
     # optimization idx1
-    fbaout1 = fba(S, b, lb, ub, idx1; sense = sense1, lp_model)
+    fbaout1 = fba(lp_model, idx1; sense = sense1, drop_LPsol)
     isempty(fbaout1) && return fbaout1
     val1 = objval(fbaout1)
 
@@ -61,7 +65,7 @@ function fba(S, b, lb, ub, idx1::Integer, idx2::Integer;
     set_ub_con!(lp_model, val1 + btol, idx1)
 
     # optimization idx2
-    fbaout2 = fba(S, b, lb, ub, idx2; sense = sense2, lp_model, drop_LPsol)
+    fbaout2 = fba(lp_model, idx2; sense = sense2, drop_LPsol)
 
     # set back bounds
     set_lb_con!(lp_model, lb[idx1], idx1)
