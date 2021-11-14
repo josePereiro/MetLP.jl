@@ -22,6 +22,7 @@ module MetLP
     include("const.jl")
     include("utils.jl")
     include("fba.jl")
+    include("fba_lp_model.jl")
     include("fva.jl")
     include("fva_preprocess.jl")
     include("check_newbounds.jl")

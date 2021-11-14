@@ -5,9 +5,7 @@ struct FBAOut{T<:Real} <: AbstractMetState
     sol # The LP solution object 
 end
 
-FBAOut(T::DataType = Float64) = FBAOut(T[], zero(T), "", nothing)
-Base.isempty(out::FBAOut) = isempty(out.v)
-
+# empty FBAOut
 objval(out::FBAOut) = out.obj_val
 objider(out::FBAOut) = out.obj_ider
 LPsol(out::FBAOut) = out.sol
