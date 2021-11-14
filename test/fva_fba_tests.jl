@@ -5,7 +5,7 @@ function test_fva_consistency()
     m, n = size(model)
 
     # parameters
-    niter = 100
+    niter = 10
     robj = MetNets.ECOLI_MODEL_BIOMASS_IDER
     nths = clamp(nthreads() - 1, 1, 5)
     atol = 1e-5
@@ -32,24 +32,26 @@ function test_fva_consistency()
         @info("Testing FBA")
         for (rxni, rxn) in enumerate(model.rxns)
 
-            # @show rxn
+            println("-"^60)
+            @show rxn
+            @show model.lb[rxni]
+            @show model.ub[rxni]
 
             # max
-            fbaout = MetLP.fba(model, rxn; sense = MetLP.MIN_SENSE)
-            val = MetLP.objval(fbaout)
-            # @show val
-            # @show ref_lbs[rxni]
+            fbaout = MetLP.fba(model, rxn, 1; sense1 = MetLP.MIN_SENSE)
+            val = MetLP.av(model, fbaout, rxn)
+            @show val
+            @show ref_lbs[rxni]
             @test all(isapprox(ref_lbs[rxni], val; atol))
 
             # min
-            fbaout = MetLP.fba(model, rxn; sense = MetLP.MAX_SENSE)
-            val = MetLP.objval(fbaout)
-            # @show val
-            # @show ref_ubs[rxni]
+            fbaout = MetLP.fba(model, rxn, 1; sense1 = MetLP.MAX_SENSE)
+            val = MetLP.av(model, fbaout, rxn)
+            @show val
+            @show ref_ubs[rxni]
             @test all(isapprox(ref_ubs[rxni], val; atol))
 
         end
     end
-
 end
 test_fva_consistency()

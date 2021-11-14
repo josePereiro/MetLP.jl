@@ -7,13 +7,10 @@ function fba(S, b, lb, ub, obj_idx::Integer;
         up_stoi_con = false,
         solver = Clp.Optimizer
     )
-
-    T = eltype(S)
-    M, N = size(S)
     
     # build model
     if isnothing(lp_model)
-        lp_model = _build_model(S, b, lb, ub, solver)
+        lp_model = build_lp_model(S, b, lb, ub, solver)
     end
 
     # update cons
@@ -35,44 +32,42 @@ function fba(S, b, lb, ub, idx1::Integer, idx2::Integer;
         btol = 0.0, # tol of the fixation
         drop_LPsol = true,
         lp_model = nothing,
+        up_lb_con = false,
+        up_ub_con = false,
+        up_stoi_con = false,
         solver = Clp.Optimizer
     )
 
-    # maximizing obj
-    M, N = size(S)
-
+    # build model
     if isnothing(lp_model)
-        lp_model = JuMP.Model(solver)
-        @JuMP.variable(lp_model, lb[i] <= x[i=1:N] <= ub[i])
-        @JuMP.constraint(lp_model, S * x .- b .== 0.0)
+        lp_model = build_lp_model(S, b, lb, ub, solver)
     end
+
+    # update cons
+    up_stoi_con && set_stoi_con!(lp_model, S, b)
+    up_lb_con && set_lb_con!(lp_model, lb)
+    up_ub_con && set_ub_con!(lp_model, ub)
     
     # setup
-    x = lp_model[:x]
-    LPsol = drop_LPsol ? nothing : lp_model
     JuMP.set_silent(lp_model)
     
     # optimization idx1
-    @JuMP.objective(lp_model, sense1, x[idx1])
-    JuMP.optimize!(lp_model)
-    status = JuMP.termination_status(lp_model)
-    if status != JuMP.MOI.OPTIMAL
-        return FBAOut(fill(NaN, size(S, 2)), NaN, idx1, LPsol)
-    end
-    val1 = JuMP.objective_value(lp_model)
-    
+    fbaout1 = fba(S, b, lb, ub, idx1; sense = sense1, lp_model)
+    isempty(fbaout1) && return fbaout1
+    val1 = objval(fbaout1)
+
+    # fix obj1
+    set_lb_con!(lp_model, val1 - btol, idx1)
+    set_ub_con!(lp_model, val1 + btol, idx1)
+
     # optimization idx2
-    dflux = abs(val1 * btol)
-    @JuMP.constraint(lp_model, val1 - dflux <= x[idx1] <= val1 + dflux)
-    @JuMP.objective(lp_model, sense2, x[idx2])
-    JuMP.optimize!(lp_model)
-    status = JuMP.termination_status(lp_model)
-    if status != JuMP.MOI.OPTIMAL
-        return FBAOut(fill(NaN, size(S, 2)), NaN, idx1, LPsol)
-    end
-    
-    v = JuMP.value.(x)
-    FBAOut(v, v[idx1], idx1, LPsol)
+    fbaout2 = fba(S, b, lb, ub, idx2; sense = sense2, lp_model, drop_LPsol)
+
+    # set back bounds
+    set_lb_con!(lp_model, lb[idx1], idx1)
+    set_ub_con!(lp_model, ub[idx1], idx1)
+
+    return fbaout2
 end
 
 function fba(model::MetNet, obj_ider::IDER_TYPE; kwargs...)
