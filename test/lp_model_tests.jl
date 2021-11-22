@@ -1,17 +1,21 @@
 function run_lp_model_tests()
-    model = MetNets.toy_model()
-    M, N = size(model)
-    lp_model = MetLP.build_lp_model(model)
+    metnet = MetNets.toy_model()
+    M, N = size(metnet)
+    lp_model = MetLP.build_lp_model(metnet)
 
     # bounds are correct
-    @test all(MetLP._get_con_rhs(lp_model, MetLP._LB_CON_KEY) .== model.lb)
-    @test all(MetLP._get_con_rhs(lp_model, MetLP._UB_CON_KEY) .== model.ub)
+    @show MetLP.lb(lp_model)
+    @show MetLP.lb(metnet)
+    @show MetLP.ub(lp_model)
+    @show MetLP.ub(metnet)
+    @test all(MetLP.lb(lp_model) .== MetLP.lb(metnet))
+    @test all(MetLP.ub(lp_model) .== MetLP.ub(metnet))
     
     # test bound reset
-    MetLP.set_lb_con!(lp_model, zeros(N))
-    @test all(MetLP._get_con_rhs(lp_model, MetLP._LB_CON_KEY) .== 0.0)
-    MetLP.set_ub_con!(lp_model, ones(N))
-    @test all(MetLP._get_con_rhs(lp_model, MetLP._UB_CON_KEY) .== 1.0)
+    MetLP.lb!(lp_model, zeros(N))
+    @test all(MetLP.lb(lp_model) .== 0.0)
+    MetLP.ub!(lp_model, ones(N))
+    @test all(MetLP.ub(lp_model) .== 1.0)
 
 end
 run_lp_model_tests();

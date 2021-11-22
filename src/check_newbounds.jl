@@ -29,8 +29,8 @@ function check_newbounds(S, b, lb, ub, newlb, newub,
 
         # (TODO: This can be improved by updating only the relevant lp_model bounds)
         # Update bounds 
-        set_lb_con!(lp_model, wlb)
-        set_ub_con!(lp_model, wub)
+        lb!(lp_model, wlb)
+        ub!(lp_model, wub)
 
         # fba
         fbaout = fba(lp_model, check_obj)
@@ -48,8 +48,8 @@ function check_newbounds(S, b, lb, ub, newlb, newub,
                 wlb[idx], wub[idx] = newlb[idx], newub[idx]
 
                 # Update bounds
-                set_lb_con!(lp_model, wlb)
-                set_ub_con!(lp_model, wub)
+                lb!(lp_model, wlb)
+                ub!(lp_model, wub)
 
                 # fba
                 fbaout = fba(lp_model, check_obj)
@@ -66,8 +66,8 @@ function check_newbounds(S, b, lb, ub, newlb, newub,
                         wcol[idx] = newb
 
                         # Update bounds
-                        set_lb_con!(lp_model, wlb)
-                        set_ub_con!(lp_model, wub)
+                        lb!(lp_model, wlb)
+                        ub!(lp_model, wub)
 
                         # fba
                         fbaout = fba(lp_model, check_obj)

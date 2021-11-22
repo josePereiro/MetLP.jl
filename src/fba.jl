@@ -23,11 +23,41 @@ function fba(S, b, lb, ub, obj_idx::Integer;
     else
         # update cons
         up_stoi_con && set_stoi_con!(lp_model, S, b)
-        up_lb_con && set_lb_con!(lp_model, lb)
-        up_ub_con && set_ub_con!(lp_model, ub)
+        up_lb_con && lb!(lp_model, lb)
+        up_ub_con && ub!(lp_model, ub)
     end
 
     fba(lp_model, obj_idx; sense, drop_LPsol)
+end
+
+function fba(lp_model::JuMP.Model, idx1::Integer, idx2::Integer; 
+        sense1 = MAX_SENSE,
+        sense2 = MIN_SENSE,
+        btol = 0.0, # tol of the fixation
+        drop_LPsol = true
+    )
+
+    # backup initial bounds
+    lb0 = lb(lp_model, idx1)
+    ub0 = ub(lp_model, idx1)
+
+    # optimization idx1
+    fbaout1 = fba(lp_model, idx1; sense = sense1, drop_LPsol)
+    isempty(fbaout1) && return fbaout1
+    val1 = objval(fbaout1)
+
+    # fix obj1
+    lb!(lp_model, idx1, val1 - btol)
+    ub!(lp_model, idx1, val1 + btol)
+
+    # optimization idx2
+    fbaout2 = fba(lp_model, idx2; sense = sense2, drop_LPsol)
+
+    # set back bounds
+    lb!(lp_model, idx1, lb0)
+    ub!(lp_model, idx1, ub0)
+
+    return fbaout2
 end
 
 function fba(S, b, lb, ub, idx1::Integer, idx2::Integer;
@@ -48,27 +78,14 @@ function fba(S, b, lb, ub, idx1::Integer, idx2::Integer;
     else
         # update cons
         up_stoi_con && set_stoi_con!(lp_model, S, b)
-        up_lb_con && set_lb_con!(lp_model, lb)
-        up_ub_con && set_ub_con!(lp_model, ub)
+        up_lb_con && lb!(lp_model, lb)
+        up_ub_con && ub!(lp_model, ub)
     end
     
-    # optimization idx1
-    fbaout1 = fba(lp_model, idx1; sense = sense1, drop_LPsol)
-    isempty(fbaout1) && return fbaout1
-    val1 = objval(fbaout1)
-
-    # fix obj1
-    set_lb_con!(lp_model, idx1, val1 - btol)
-    set_ub_con!(lp_model, idx1, val1 + btol)
-
-    # optimization idx2
-    fbaout2 = fba(lp_model, idx2; sense = sense2, drop_LPsol)
-
-    # set back bounds
-    set_lb_con!(lp_model, idx1, lb[idx1])
-    set_ub_con!(lp_model, idx1, ub[idx1])
-
-    return fbaout2
+    return fba(lp_model, idx1, idx2; 
+        sense1, sense2, btol, drop_LPsol
+    )
+    
 end
 
 function fba(model::MetNet, obj_ider::IDER_TYPE; kwargs...)
