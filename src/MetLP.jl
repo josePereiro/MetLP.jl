@@ -4,11 +4,6 @@ module MetLP
     using Base.Threads
     using SparseArrays
 
-    # TODO MathProgBase is deprecated, update the code!!!
-    # Possibly make pull request for MetabolicEP too
-    # import MathProgBase
-    # import MathProgBase.HighLevelInterface: linprog
-    # import Clp: ClpSolver
     import MetNets
     import MetNets: metindex, rxnindex, 
         MetNet, IDER_TYPE, AbstractMetState, 

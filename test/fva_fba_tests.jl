@@ -9,6 +9,12 @@ function test_fva_consistency()
     robj = MetNets.ECOLI_MODEL_BIOMASS_IDER
     nths = clamp(nthreads() - 1, 1, 5)
     atol = 1e-5
+
+    # Test fba
+    fbaout0 = MetLP.fba(model, robj)
+    objval0 = MetLP.av(model, fbaout0, robj)
+    @show objval0
+    @test objval0 > 0.0
     
     # Testing fva consistency checking and not checking an obj value
     for (testname, check_obj) in [
@@ -39,6 +45,7 @@ function test_fva_consistency()
 
             # max
             fbaout = MetLP.fba(model, rxn, 1; sense1 = MetLP.MIN_SENSE)
+            @test MetLP.av(model, fbaout, rxn) == MetLP.av(fbaout, rxni) # test interface
             val = MetLP.av(model, fbaout, rxn)
             @show val
             @show ref_lbs[rxni]
@@ -47,6 +54,7 @@ function test_fva_consistency()
             # min
             fbaout = MetLP.fba(model, rxn, 1; sense1 = MetLP.MAX_SENSE)
             val = MetLP.av(model, fbaout, rxn)
+            @test val == MetLP.av(fbaout, rxni)
             @show val
             @show ref_ubs[rxni]
             @test all(isapprox(ref_ubs[rxni], val; atol))

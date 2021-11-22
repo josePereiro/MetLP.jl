@@ -58,15 +58,15 @@ function fba(S, b, lb, ub, idx1::Integer, idx2::Integer;
     val1 = objval(fbaout1)
 
     # fix obj1
-    set_lb_con!(lp_model, val1 - btol, idx1)
-    set_ub_con!(lp_model, val1 + btol, idx1)
+    set_lb_con!(lp_model, idx1, val1 - btol)
+    set_ub_con!(lp_model, idx1, val1 + btol)
 
     # optimization idx2
     fbaout2 = fba(lp_model, idx2; sense = sense2, drop_LPsol)
 
     # set back bounds
-    set_lb_con!(lp_model, lb[idx1], idx1)
-    set_ub_con!(lp_model, ub[idx1], idx1)
+    set_lb_con!(lp_model, idx1, lb[idx1])
+    set_ub_con!(lp_model, idx1, ub[idx1])
 
     return fbaout2
 end

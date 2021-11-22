@@ -15,6 +15,8 @@ function _up_con_rhs!(lp_model::JuMP.Model, conv_key::Symbol, vals::Vector, cidx
 end
 _up_con_rhs!(lp_model::JuMP.Model, conv_key::Symbol, val::Number, cidx::Integer) = _up_con_rhs!(lp_model, conv_key, [val], [cidx])
 
+_get_con_rhs(lp_model::JuMP.Model, conv_key::Symbol) = JuMP.normalized_rhs.(lp_model[conv_key])
+
 function _delete!(lp_model, con)
     try
         JuMP.delete(lp_model, con)
@@ -36,7 +38,16 @@ function build_lp_model(S, b, lb, ub, solver)
     set_stoi_con!(lp_model, S, b)
     return lp_model
 end
-build_lp_model(net::MetNets.MetNet, solver) = build_lp_model(net.S, net.b, net.lb, net.ub, solver) 
+build_lp_model(net::MetNets.MetNet, solver) = build_lp_model(net.S, net.b, net.lb, net.ub, solver)
+build_lp_model(net::MetNets.MetNet; solver = Clp.Optimizer) = build_lp_model(net, solver)
+
+function set_start_value(lp_model, vals)
+    xs = _get_vars(lp_model)
+    for (x, val) in zip(xs, vals)
+        JuMP.set_start_value(x, val)
+    end
+    return lp_model
+end
 
 function set_stoi_con!(lp_model, S, b)
     haskey(lp_model, _STOI_CON_KEY) && _delete!(lp_model, _STOI_CON_KEY)
@@ -45,7 +56,7 @@ function set_stoi_con!(lp_model, S, b)
     return lp_model
 end
 
-function set_lb_con!(lp_model, lb, cidxs = 1:_length(lp_model))
+function set_lb_con!(lp_model, cidxs, lb)
     if haskey(lp_model, _LB_CON_KEY)
         _up_con_rhs!(lp_model, _LB_CON_KEY, lb, cidxs)
     else
@@ -54,8 +65,9 @@ function set_lb_con!(lp_model, lb, cidxs = 1:_length(lp_model))
     end
     return lp_model
 end
+set_lb_con!(lp_model, lb) = set_lb_con!(lp_model, 1:_length(lp_model), lb)
 
-function set_ub_con!(lp_model, ub, cidxs = 1:_length(lp_model))
+function set_ub_con!(lp_model, cidxs, ub)
     if haskey(lp_model, _UB_CON_KEY)
         _up_con_rhs!(lp_model, _UB_CON_KEY, ub, cidxs)
     else
@@ -64,6 +76,7 @@ function set_ub_con!(lp_model, ub, cidxs = 1:_length(lp_model))
     end
     return lp_model
 end
+set_ub_con!(lp_model, lb) = set_ub_con!(lp_model, 1:_length(lp_model), lb)
 
 function optimize!(lp_model, obj_idx; sense = JuMP.MOI.MAX_SENSE)
     x = _get_vars(lp_model)
