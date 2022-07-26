@@ -108,13 +108,16 @@ function optimize!(lp_model::LPModel, obj_idx; sense = JuMP.MOI.MAX_SENSE)
 end
 
 ## ------------------------------------------------------------------------------
+function solution_found(lp_model::LPModel)
+    status = JuMP.termination_status(lp_model) 
+    return status == JuMP.MOI.OPTIMAL || status == JuMP.MOI.LOCALLY_SOLVED
+end
+
+## ------------------------------------------------------------------------------
 function FBAOut(lp_model::LPModel, obj_idx; drop_LPsol = true)
     N = length(_get_vars(lp_model))
-    status = JuMP.termination_status(lp_model)
     LPsol = drop_LPsol ? nothing : lp_model
-    if status != JuMP.MOI.OPTIMAL
-        return FBAOut(fill(NaN, N), NaN, obj_idx, LPsol)
-    end
+    !solution_found(lp_model) && return FBAOut(fill(NaN, N), NaN, obj_idx, LPsol)
     x = _get_vars(lp_model)
     v = JuMP.value.(x)
     return FBAOut(v, v[obj_idx], obj_idx, LPsol)

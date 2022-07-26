@@ -15,7 +15,7 @@ function check_newbounds(S, b, lb, ub, newlb, newub,
     ref_obj_val = objval(fbaout)
 
     # working copy
-    wlb, wub = deepcopy.([lb, ub])
+    wlb, wub = deepcopy(lb), deepcopy(ub)
 
     icount = length(idxs)
     batchlen = max(1, min(batchlen, length(idxs)))
