@@ -99,21 +99,25 @@ function ub!(lp_model::LPModel, cidxs, ub)
 end
 ub!(lp_model::LPModel, ub) = ub!(lp_model, 1:_length(lp_model), ub)
 
-## ------------------------------------------------------------------------------
-function optimize!(lp_model::LPModel, obj_idx; sense = JuMP.MOI.MAX_SENSE)
-    x = _get_vars(lp_model)
-    @JuMP.objective(lp_model, sense, x[obj_idx])
-    JuMP.optimize!(lp_model)
-    return lp_model
+import MetNets.bounds
+import MetNets.bounds!
+bounds(lp_model::LPModel) = (lb(lp_model), ub(lp_model))
+bounds(lp_model::LPModel, idx) = (lb(lp_model, idx), ub(lp_model, idx))
+bounds!(lp_model::LPModel, idx, lb, ub) = (lb!(lp_model, idx, lb); ub!(lp_model, idx, ub); nothing)
+function bounds!(lp_model::LPModel, idx; lb = nothing, ub = nothing) 
+    isnothing(lb) || lb!(lp_model, idx, lb)
+    isnothing(ub) || ub!(lp_model, idx, ub)
+    return nothing
 end
 
 ## ------------------------------------------------------------------------------
 function solution_found(lp_model::LPModel)
     status = JuMP.termination_status(lp_model) 
-    return status == JuMP.MOI.OPTIMAL || status == JuMP.MOI.LOCALLY_SOLVED
+    return status == JuMP.MOI.OPTIMAL || status == JuMP.MOI.LOCALLY_SOLVED || status == JuMP.MOI.ALMOST_LOCALLY_SOLVED
 end
 
 ## ------------------------------------------------------------------------------
+# TODO: Change to LPOut
 function FBAOut(lp_model::LPModel, obj_idx; drop_LPsol = true)
     N = length(_get_vars(lp_model))
     LPsol = drop_LPsol ? nothing : lp_model

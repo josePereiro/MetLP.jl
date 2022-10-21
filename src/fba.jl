@@ -1,13 +1,38 @@
+## ------------------------------------------------------------------------------
+function optimize_fba_obj!(lp_model::LPModel, c::AbstractVector; sense = JuMP.MOI.MAX_SENSE)
+    x = _get_vars(lp_model)
+    @JuMP.objective(lp_model, sense, c' * x)
+    JuMP.optimize!(lp_model)
+    return lp_model
+end
+
+function optimize_fba_obj!(lp_model::LPModel, obj_idx::IDER_TYPE; sense = JuMP.MOI.MAX_SENSE)
+    N = _length(lp_model)
+    c = spzeros(N)
+    c[obj_idx] = 1.0
+    optimize_fba_obj!(lp_model, c; sense)
+end
+
+## ------------------------------------------------------------------------------
 function fba(lp_model::JuMP.Model, obj_idx::Integer; 
         sense = MAX_SENSE, drop_LPsol = true
     )
     
-    optimize!(lp_model, obj_idx; sense)
+    optimize_fba_obj!(lp_model, obj_idx; sense)
 
     return FBAOut(lp_model, obj_idx; drop_LPsol)
 end
 
-function fba(S, b, lb, ub, obj_idx::Integer; 
+function fba(lp_model::JuMP.Model, c; 
+        sense = MAX_SENSE, drop_LPsol = true
+    )
+
+    optimize_fba_obj!(lp_model, c; sense)
+
+    return FBAOut(lp_model, findfirst(!iszero, c); drop_LPsol)
+end
+
+function fba(S, b, lb, ub, c; 
         sense = MAX_SENSE, 
         drop_LPsol = true, 
         lp_model = nothing,
@@ -27,7 +52,13 @@ function fba(S, b, lb, ub, obj_idx::Integer;
         up_ub_con && ub!(lp_model, ub)
     end
 
-    fba(lp_model, obj_idx; sense, drop_LPsol)
+    fba(lp_model, c; sense, drop_LPsol)
+end
+
+function fba(S, b, lb, ub, obj_idx::Integer; kwargs...) 
+    c = spzeros(size(S, 2))
+    c[obj_idx] = 1.0
+    return fba(S, b, lb, ub, c; kwargs...) 
 end
 
 function fba(lp_model::JuMP.Model, idx1::Integer, idx2::Integer; 
@@ -86,6 +117,11 @@ function fba(S, b, lb, ub, idx1::Integer, idx2::Integer;
         sense1, sense2, btol, drop_LPsol
     )
     
+end
+
+function fba(model::MetNet; kwargs...)
+    model_fields = _extract_dense(model, [:S, :b, :lb, :ub])
+    return fba(model_fields..., model.c; kwargs...)
 end
 
 function fba(model::MetNet, obj_ider::IDER_TYPE; kwargs...)
